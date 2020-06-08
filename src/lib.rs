@@ -47,6 +47,10 @@ fn rem_by_index(ctx: &Context, args: Vec<String>) -> RedisResult {
     ops::Remove::from(ctx, &args)?.process()
 }
 
+fn groom(_: &Context, _: Vec<String>) -> RedisResult {
+    ops::PeriodicGroom::spawn()
+}
+
 redis_module! {
     name: "map",
     version: 1,
@@ -56,5 +60,6 @@ redis_module! {
         ["map.msetex_indexed", msetex_indexed, "write deny-oom no-cluster", 1, 1, 1],
         ["map.get_by_index", get_by_index, "readonly no-cluster", 1, 1, 1],
         ["map.rem_by_index", rem_by_index, "write no-cluster", 1, 1, 1],
+        ["map.groom", groom, "write no-cluster", 1, 1, 1],
     ]
 }

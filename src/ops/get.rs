@@ -38,7 +38,7 @@ impl<'a> Get<'a> {
 }
 
 impl Namespaced for Get<'_> {
-    fn namespace(&self) -> &String {
+    fn namespace(&self) -> &str {
         self.namespace
     }
 }

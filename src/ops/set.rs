@@ -69,7 +69,12 @@ impl<'a> Set<'a> {
             interleaved.insert(0, &meta);
             let index_args: Vec<&str> = interleaved.iter().map(AsRef::as_ref).collect();
             self.ctx.call("HMSET", index_args.as_slice())?;
-            self.ctx.call("EXPIRE", &[&meta, &self.expiry])?;
+
+            // expire `meta` one second later than the main key so it is evicted before meta
+            // and thus has access to the index values
+            let expiry_num: usize = self.expiry.parse()?;
+            let expiry_incr = (expiry_num + 1).to_string();
+            self.ctx.call("EXPIRE", &[&meta, &expiry_incr])?;
         }
         REDIS_OK
     }
@@ -82,7 +87,7 @@ impl<'a> Set<'a> {
 // }
 
 impl Namespaced for Set<'_> {
-    fn namespace(&self) -> &String {
+    fn namespace(&self) -> &str {
         self.namespace
     }
 }

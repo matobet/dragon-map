@@ -37,7 +37,7 @@ impl<'a> Remove<'a> {
 }
 
 impl Namespaced for Remove<'_> {
-    fn namespace(&self) -> &String {
+    fn namespace(&self) -> &str {
         self.namespace
     }
 }

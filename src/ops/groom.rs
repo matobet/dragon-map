@@ -4,22 +4,19 @@ use super::*;
 
 pub struct Groom<'a> {
     ctx: &'a Context,
-    namespace: String,
-    key: String,
+    namespace: &'a str,
+    key: &'a str,
 }
 
 impl<'a> Groom<'a> {
     pub fn from(ctx: &'a Context, key_str: &'a str) -> Groom<'a> {
         let key = if key_str.starts_with("meta_") {
-            key_str[META_PREFIX.len()..].to_string()
+            &key_str[META_PREFIX.len()..]
         } else {
-            key_str.to_string()
+            key_str
         };
 
-        let parts: Vec<&str> = key.split(SEPARATOR).collect();
-        let namespace = parts[0].to_string();
-        let key = parts[1].to_string();
-
+        let (namespace, key) = split_namespace(key);
         Groom { ctx, namespace, key }
     }
 
@@ -30,8 +27,8 @@ impl<'a> Groom<'a> {
 }
 
 impl Namespaced for Groom<'_> {
-    fn namespace(&self) -> &String {
-        &self.namespace
+    fn namespace(&self) -> &str {
+        self.namespace
     }
 }
 
