@@ -82,7 +82,7 @@ struct GroomIndex<'a> {
 
 impl GroomIndex<'_> {
     fn perform(&self) -> RedisResult {
-        self.ctx.log_debug(&format!("Grooming {}", self.index));
+        // self.ctx.log_debug(&format!("Grooming {}", self.index));
         let keys = self.with_lock(|| self.srandmember(self.index, BATCH_SIZE))?;
         for key in &keys {
             self.with_lock(|| {

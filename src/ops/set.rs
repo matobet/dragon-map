@@ -22,11 +22,11 @@ impl<'a> Set<'a> {
         let expiry = &args[2];
         let index_count = args[3].parse()?;
 
-        if args.len() - 3 < index_count {
+        if args.len() - 4 < index_count {
             return Err(RedisError::WrongArity);
         }
 
-        if (args.len() - 3 - index_count) % (index_count + 1) != 0 {
+        if (args.len() - 4 - index_count) % (index_count + 2) != 0 {
             return Err(RedisError::WrongArity);
         }
 

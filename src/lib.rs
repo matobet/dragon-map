@@ -3,7 +3,7 @@ extern crate redis_module;
 
 use std::os::raw::{c_char, c_int};
 
-use redis_module::{Context, raw as rawmod, RedisError, RedisResult, RedisString};
+use redis_module::{Context, raw as rawmod, RedisError, RedisResult, RedisString, REDIS_OK};
 
 mod ops;
 
@@ -44,6 +44,11 @@ fn get_by_index(ctx: &Context, args: Vec<String>) -> RedisResult {
 
 // MAP.rem_by_index <namespace> idx idx_val
 fn rem_by_index(ctx: &Context, args: Vec<String>) -> RedisResult {
+    ops::RemoveByIndex::from(ctx, &args)?.process()
+}
+
+// MAP.mrem <namespace> k1 k2 ... kn
+fn mrem(ctx: &Context, args: Vec<String>) -> RedisResult {
     ops::Remove::from(ctx, &args)?.process()
 }
 
@@ -58,6 +63,7 @@ redis_module! {
     init: init,
     commands: [
         ["map.msetex_indexed", msetex_indexed, "write deny-oom no-cluster", 1, 1, 1],
+        ["map.mrem", mrem, "write no-cluster", 1, 1, 1],
         ["map.get_by_index", get_by_index, "readonly no-cluster", 1, 1, 1],
         ["map.rem_by_index", rem_by_index, "write no-cluster", 1, 1, 1],
         ["map.groom", groom, "write no-cluster", 1, 1, 1],

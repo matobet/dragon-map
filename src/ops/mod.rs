@@ -3,12 +3,14 @@ use redis_module::{RedisValue, Context, RedisError, RedisResult, REDIS_OK};
 mod get;
 mod groom;
 mod rem;
+mod rem_by_index;
 mod set;
 mod periodic;
 
 pub use get::Get;
 pub use groom::Groom;
 pub use rem::Remove;
+pub use rem_by_index::RemoveByIndex;
 pub use set::Set;
 pub use periodic::PeriodicGroom;
 
