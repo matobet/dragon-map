@@ -13,10 +13,13 @@ pub extern "C" fn handle_event(raw_ctx: *mut rawmod::RedisModuleCtx, t: c_int, e
     let ctx = redis_module::Context::new(raw_ctx);
 
     let key_str = RedisString::from_ptr(key).unwrap();
-    ctx.log_debug(&format!("Evicting {}", key_str));
+
+    if cfg!(debug_assetions) {
+        ctx.log_debug(&format!("Evicting {}", key_str));
+    }
 
     let ctx = Context::new(raw_ctx);
-    ops::Groom::from(&ctx, key_str).perform();
+    ops::EventGroom::from(&ctx, key_str).perform();
 
     rawmod::REDISMODULE_OK as c_int
 }
@@ -26,6 +29,8 @@ pub extern "C" fn init(raw_ctx: *mut rawmod::RedisModuleCtx) -> c_int {
         rawmod::RedisModule_SubscribeToKeyspaceEvents.unwrap()
             (raw_ctx, rawmod::REDISMODULE_NOTIFY_EVICTED as i32 | rawmod::REDISMODULE_NOTIFY_EXPIRED as i32, Some(handle_event))
     } == rawmod::Status::Err as c_int { return rawmod::Status::Err as c_int }
+
+    ops::Init::from(&redis_module::Context::new(raw_ctx)).perform();
 
     rawmod::REDISMODULE_OK as c_int
 }

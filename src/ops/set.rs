@@ -70,11 +70,11 @@ impl<'a> Set<'a> {
             let index_args: Vec<&str> = interleaved.iter().map(AsRef::as_ref).collect();
             self.ctx.call("HMSET", index_args.as_slice())?;
 
-            // expire `meta` one second later than the main key so it is evicted before meta
+            // expire `meta` twice later than the main key so it is evicted before meta
             // and thus has access to the index values
             let expiry_num: usize = self.expiry.parse()?;
-            let expiry_incr = (expiry_num + 1).to_string();
-            self.ctx.call("EXPIRE", &[&meta, &expiry_incr])?;
+            let expiry_double = (expiry_num * 2).to_string();
+            self.ctx.call("EXPIRE", &[&meta, &expiry_double])?;
         }
         REDIS_OK
     }

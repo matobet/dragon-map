@@ -59,15 +59,15 @@ impl Contextual for RedisIterator<'_> {
 
 impl Threaded for RedisIterator<'_> {}
 
-pub struct Groom<'a> {
+pub struct EventGroom<'a> {
     ctx: &'a Context,
     namespace: &'a str,
     key: &'a str,
     is_meta: bool
 }
 
-impl<'a> Groom<'a> {
-    pub fn from(ctx: &'a Context, key_str: &'a str) -> Groom<'a> {
+impl<'a> EventGroom<'a> {
+    pub fn from(ctx: &'a Context, key_str: &'a str) -> EventGroom<'a> {
         let is_meta = key_str.starts_with("meta_");
         let key = if is_meta {
             &key_str[META_PREFIX.len()..]
@@ -76,35 +76,40 @@ impl<'a> Groom<'a> {
         };
 
         let (namespace, key) = split_namespace(key);
-        Groom { ctx, namespace, key, is_meta }
+        EventGroom { ctx, namespace, key, is_meta }
     }
 
     pub fn perform(&self) {
+        self.incr("events").unwrap();
+        self.incr(if self.is_meta { "metas_expired" } else { "keys_expired" }).unwrap();
+        let exists_primary = self.is_meta && self.exists(self.prefixed(self.key)).unwrap();
+
         // clean_key ensures that meta is removed in case of key expiry
         // and vice versa that key is removed in case of meta expiry
         self.clean_key(&self.key).map(|_| ())
             .unwrap_or_else(|e| self.ctx.log(LogLevel::Warning, &format!("Error grooming key [ {} ]: {}", self.key, e)));
 
         // additionally in case of meta expiry we want to trigger the Targeted Groomer for this particular key
-        if self.is_meta {
+        if exists_primary {
+            self.incr("targeteds").unwrap();
             TargetedGroom::spawn(self.namespace.to_string(), self.key.to_string());
         }
     }
 }
 
-impl Namespaced for Groom<'_> {
+impl Namespaced for EventGroom<'_> {
     fn namespace(&self) -> &str {
         self.namespace
     }
 }
 
-impl Contextual for Groom<'_> {
+impl Contextual for EventGroom<'_> {
     fn context(&self) -> &Context {
         &self.ctx
     }
 }
 
-impl CleanOperation for Groom<'_> {}
+impl CleanOperation for EventGroom<'_> {}
 
 use redis_module::RedisValue;
 use std::time::Instant;
@@ -172,7 +177,9 @@ impl GroomIndex<'_> {
         for key in &keys {
             self.with_lock(|| {
                 if !self.exists(&self.prefixed(key))? {
-                    self.ctx.log_debug(&format!("{} does not exist. Removing {}", self.prefixed(key), key));
+                    if cfg!(debug_assertions) {
+                        self.ctx.log_debug(&format!("{} does not exist. Removing {}", self.prefixed(key), key));
+                    }
                     self.srem(self.index, key)?;
                 }
                 REDIS_OK

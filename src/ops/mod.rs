@@ -7,7 +7,7 @@ mod rem_by_index;
 mod set;
 
 pub use get::Get;
-pub use groom::Groom;
+pub use groom::EventGroom;
 pub use groom::PeriodicGroom;
 pub use rem::Remove;
 pub use rem_by_index::RemoveByIndex;
@@ -61,6 +61,14 @@ trait Contextual {
         self.int_cmd("EXISTS", &[key.as_ref()]).map(|n| n == 1)
     }
 
+    fn set<S: AsRef<str>, T: AsRef<str>>(&self, key: S, value: T) -> Result<(), RedisError> {
+        self.context().call("SET", &[key.as_ref(), value.as_ref()]).map(|_|())
+    }
+
+    fn incr<S: AsRef<str>>(&self, key: S) -> Result<i64, RedisError> {
+        self.int_cmd("INCR", &[key.as_ref()])
+    }
+
     fn smembers<S: AsRef<str>>(&self, key: S) -> Result<Vec<String>, RedisError> {
         self.string_array_cmd("SMEMBERS", &[key.as_ref()], format!("Assertion failed: {} index was not a set!", key.as_ref()))
     }
@@ -106,6 +114,7 @@ trait CleanOperation: Contextual + Namespaced {
         let meta_key = self.prefixed_meta(key.as_ref());
         let meta = self.hgetall(&meta_key)?;
         if meta.is_empty() {
+            self.incr("meta_missing")?;
             REDIS_OK
         } else {
             for pair in meta.chunks_exact(2) {
@@ -121,5 +130,28 @@ trait CleanOperation: Contextual + Namespaced {
         self.srem(self.prefixed_idx(idx, idx_val), key)?;
 
         REDIS_OK
+    }
+}
+
+pub struct Init<'a> {
+    ctx: &'a Context
+}
+
+impl<'a> Init<'a> {
+    pub fn from(ctx: &'a Context) -> Init<'a> {
+        Init { ctx }
+    }
+
+    pub fn perform(&self) {
+        self.set("events", "0").unwrap();
+        self.set("metas_expired", "0").unwrap();
+        self.set("keys_expired", "0").unwrap();
+        self.set("meta_missing", "0").unwrap();
+    }
+}
+
+impl<'a> Contextual for Init<'a> {
+    fn context(&self) -> &Context {
+        self.ctx
     }
 }
