@@ -1,3 +1,5 @@
+#![feature(type_alias_impl_trait)]
+
 #[macro_use]
 extern crate redis_module;
 
@@ -53,7 +55,9 @@ fn mrem(ctx: &Context, args: Vec<String>) -> RedisResult {
 }
 
 fn groom(_: &Context, _: Vec<String>) -> RedisResult {
-    ops::PeriodicGroom::spawn()
+    ops::PeriodicGroom::spawn();
+
+    REDIS_OK
 }
 
 redis_module! {

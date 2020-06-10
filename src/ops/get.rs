@@ -43,7 +43,7 @@ impl Namespaced for Get<'_> {
     }
 }
 
-impl Operation for Get<'_> {
+impl Contextual for Get<'_> {
     fn context(&self) -> &Context {
         self.ctx
     }

@@ -5,14 +5,13 @@ mod groom;
 mod rem;
 mod rem_by_index;
 mod set;
-mod periodic;
 
 pub use get::Get;
 pub use groom::Groom;
+pub use groom::PeriodicGroom;
 pub use rem::Remove;
 pub use rem_by_index::RemoveByIndex;
 pub use set::Set;
-pub use periodic::PeriodicGroom;
 
 const SEPARATOR: char = ':';
 const META_PREFIX: &str = "meta_";
@@ -55,7 +54,7 @@ fn extract_strings(values: Vec<RedisValue>) -> Vec<String> {
     strings
 }
 
-trait Operation {
+trait Contextual {
     fn context(&self) -> &Context;
 
     fn exists<S: AsRef<str>>(&self, key: S) -> Result<bool, RedisError> {
@@ -96,7 +95,7 @@ trait Operation {
     }
 }
 
-trait CleanOperation: Operation + Namespaced {
+trait CleanOperation: Contextual + Namespaced {
     fn del<S: AsRef<str>>(&self, key: S) -> RedisResult {
         self.context().call("DEL", &[key.as_ref()])
     }

@@ -32,7 +32,7 @@ impl Namespaced for Remove<'_> {
     }
 }
 
-impl Operation for Remove<'_> {
+impl Contextual for Remove<'_> {
     fn context(&self) -> &Context {
         self.ctx
     }

@@ -42,7 +42,7 @@ impl Namespaced for RemoveByIndex<'_> {
     }
 }
 
-impl Operation for RemoveByIndex<'_> {
+impl Contextual for RemoveByIndex<'_> {
     fn context(&self) -> &Context {
         self.ctx
     }

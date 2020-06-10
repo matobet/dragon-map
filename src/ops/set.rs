@@ -92,7 +92,7 @@ impl Namespaced for Set<'_> {
     }
 }
 
-impl Operation for Set<'_> {
+impl Contextual for Set<'_> {
     fn context(&self) -> &Context {
         self.ctx
     }
