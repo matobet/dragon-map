@@ -10,7 +10,7 @@ pub struct RemoveByIndex<'a> {
 }
 
 impl<'a> RemoveByIndex<'a> {
-    pub fn from(ctx: &'a Context, args: &'a Vec<String>) -> Result<RemoveByIndex<'a>, RedisError> {
+    pub fn from(ctx: &'a Context, args: &'a [String]) -> Result<RemoveByIndex<'a>, RedisError> {
         if args.len() != 4 {
             return Err(RedisError::WrongArity);
         }

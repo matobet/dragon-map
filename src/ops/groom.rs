@@ -82,7 +82,7 @@ impl<'a> EventGroom<'a> {
     pub fn perform(&self) {
         self.incr("events").unwrap();
         self.incr(if self.is_meta { "metas_expired" } else { "keys_expired" }).unwrap();
-        let exists_primary = self.is_meta && self.exists(self.prefixed(self.key)).unwrap();
+        let exists_primary = self.is_meta && self.exists(&self.prefixed(self.key)).unwrap();
 
         // clean_key ensures that meta is removed in case of key expiry
         // and vice versa that key is removed in case of meta expiry
@@ -223,7 +223,7 @@ impl<'a> TargetedGroom<'a> {
                     // the key has reappeared in Redis, abort
                     return
                 }
-                self.srem(index, &self.key).unwrap();
+                self.srem(&index, &self.key).unwrap();
             })
         }
     }

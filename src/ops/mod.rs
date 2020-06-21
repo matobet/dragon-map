@@ -20,16 +20,16 @@ const INDEX_PREFIX: &str = "idx_";
 trait Namespaced {
     fn namespace(&self) -> &str;
 
-    fn prefixed<S: AsRef<str>>(&self, key: S) -> String {
-        format!("{}{separator}{}", self.namespace(), key.as_ref(), separator = SEPARATOR)
+    fn prefixed(&self, key: &str) -> String {
+        format!("{}{separator}{}", self.namespace(), key, separator = SEPARATOR)
     }
 
-    fn prefixed_meta<S: AsRef<str>>(&self, key: S) -> String {
-        format!("{meta}{}{separator}{}", self.namespace(), key.as_ref(), meta = META_PREFIX, separator = SEPARATOR)
+    fn prefixed_meta(&self, key: &str) -> String {
+        format!("{meta}{}{separator}{}", self.namespace(), key, meta = META_PREFIX, separator = SEPARATOR)
     }
 
-    fn prefixed_idx<S: AsRef<str>, T: AsRef<str>>(&self, idx: S, idx_val: T) -> String {
-        format!("{index}{}{separator}{}{separator}{}", self.namespace(), idx.as_ref(), idx_val.as_ref(), index = INDEX_PREFIX, separator = SEPARATOR)
+    fn prefixed_idx(&self, idx: &str, idx_val: &str) -> String {
+        format!("{index}{}{separator}{}{separator}{}", self.namespace(), idx, idx_val, index = INDEX_PREFIX, separator = SEPARATOR)
     }
 }
 
@@ -57,33 +57,33 @@ fn extract_strings(values: Vec<RedisValue>) -> Vec<String> {
 trait Contextual {
     fn context(&self) -> &Context;
 
-    fn exists<S: AsRef<str>>(&self, key: S) -> Result<bool, RedisError> {
-        self.int_cmd("EXISTS", &[key.as_ref()]).map(|n| n == 1)
+    fn exists(&self, key: &str) -> Result<bool, RedisError> {
+        self.int_cmd("EXISTS", &[key]).map(|n| n == 1)
     }
 
-    fn set<S: AsRef<str>, T: AsRef<str>>(&self, key: S, value: T) -> Result<(), RedisError> {
-        self.context().call("SET", &[key.as_ref(), value.as_ref()]).map(|_|())
+    fn set(&self, key: &str, value: &str) -> Result<(), RedisError> {
+        self.context().call("SET", &[key, value]).map(|_|())
     }
 
-    fn incr<S: AsRef<str>>(&self, key: S) -> Result<i64, RedisError> {
-        self.int_cmd("INCR", &[key.as_ref()])
+    fn incr(&self, key: &str) -> Result<i64, RedisError> {
+        self.int_cmd("INCR", &[key])
     }
 
-    fn smembers<S: AsRef<str>>(&self, key: S) -> Result<Vec<String>, RedisError> {
-        self.string_array_cmd("SMEMBERS", &[key.as_ref()], format!("Assertion failed: {} index was not a set!", key.as_ref()))
+    fn smembers(&self, key: &str) -> Result<Vec<String>, RedisError> {
+        self.string_array_cmd("SMEMBERS", &[key], format!("Assertion failed: {} index was not a set!", key))
     }
 
-    fn srandmember<S: AsRef<str>>(&self, key: S, n: usize) -> Result<Vec<String>, RedisError> {
-        self.string_array_cmd("SRANDMEMBER", &[key.as_ref(), &n.to_string()],
-                              format!("Assertion failed: {} index was not a set!", key.as_ref()))
+    fn srandmember(&self, key: &str, n: usize) -> Result<Vec<String>, RedisError> {
+        self.string_array_cmd("SRANDMEMBER", &[key, &n.to_string()],
+                              format!("Assertion failed: {} index was not a set!", key))
     }
 
-    fn srem<S: AsRef<str>, T: AsRef<str>>(&self, key: S, value: T) -> Result<i64, RedisError> {
-        self.int_cmd("SREM", &[key.as_ref(), value.as_ref()])
+    fn srem(&self, key: &str, value: &str) -> Result<i64, RedisError> {
+        self.int_cmd("SREM", &[key, value])
     }
 
-    fn hgetall<S: AsRef<str>>(&self, key: S) -> Result<Vec<String>, RedisError> {
-        self.string_array_cmd("HGETALL", &[key.as_ref()], format!("Assertion failed: {} meta was not a map!", key.as_ref()))
+    fn hgetall(&self, key: &str) -> Result<Vec<String>, RedisError> {
+        self.string_array_cmd("HGETALL", &[key], format!("Assertion failed: {} meta was not a map!", key))
     }
 
     fn int_cmd(&self, cmd: &str, args: &[&str]) -> Result<i64, RedisError> {
@@ -104,14 +104,14 @@ trait Contextual {
 }
 
 trait CleanOperation: Contextual + Namespaced {
-    fn del<S: AsRef<str>>(&self, key: S) -> RedisResult {
-        self.context().call("DEL", &[key.as_ref()])
+    fn del(&self, key: &str) -> RedisResult {
+        self.context().call("DEL", &[key])
     }
 
-    fn clean_key<S: AsRef<str>>(&self, key: S) -> RedisResult {
-        self.del(self.prefixed(key.as_ref()))?;
+    fn clean_key(&self, key: &str) -> RedisResult {
+        self.del(&self.prefixed(key))?;
 
-        let meta_key = self.prefixed_meta(key.as_ref());
+        let meta_key = self.prefixed_meta(key);
         let meta = self.hgetall(&meta_key)?;
         if meta.is_empty() {
             self.incr("meta_missing")?;
@@ -120,14 +120,14 @@ trait CleanOperation: Contextual + Namespaced {
             for pair in meta.chunks_exact(2) {
                 let idx = &pair[0];
                 let idx_val = &pair[1];
-                self.rm_from_index(key.as_ref(), idx, idx_val)?;
+                self.rm_from_index(key, idx, idx_val)?;
             }
-            self.del(meta_key)
+            self.del(&meta_key)
         }
     }
 
-    fn rm_from_index<S: AsRef<str>>(&self, key: S, idx: &String, idx_val: &String) -> RedisResult {
-        self.srem(self.prefixed_idx(idx, idx_val), key)?;
+    fn rm_from_index(&self, key: &str, idx: &str, idx_val: &str) -> RedisResult {
+        self.srem(&self.prefixed_idx(idx, idx_val), key)?;
 
         REDIS_OK
     }

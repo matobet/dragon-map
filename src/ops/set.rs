@@ -13,7 +13,7 @@ pub struct Set<'a> {
 }
 
 impl<'a> Set<'a> {
-    pub fn from(ctx: &'a Context, args: &'a Vec<String>) -> Result<Set<'a>, RedisError> {
+    pub fn from(ctx: &'a Context, args: &'a [String]) -> Result<Set<'a>, RedisError> {
         if args.len() < 3 {
             return Err(RedisError::WrongArity);
         }
@@ -58,11 +58,11 @@ impl<'a> Set<'a> {
         self.write_meta(key, index_values)
     }
 
-    fn add_to_index(&self, key: &String, idx: &String, idx_val: &String) -> RedisResult {
+    fn add_to_index(&self, key: &str, idx: &str, idx_val: &str) -> RedisResult {
         self.ctx.call("SADD", &[&self.prefixed_idx(idx, idx_val), key])
     }
 
-    fn write_meta(&self, key: &String, index_values: &[String]) -> RedisResult {
+    fn write_meta(&self, key: &str, index_values: &[String]) -> RedisResult {
         let mut interleaved: Vec<&String> = interleave(self.indices, index_values).collect();
         if !interleaved.is_empty() {
             let meta = self.prefixed_meta(key);

@@ -9,7 +9,7 @@ use redis_module::{Context, raw as rawmod, RedisError, RedisResult, RedisString,
 
 mod ops;
 
-pub extern "C" fn handle_event(raw_ctx: *mut rawmod::RedisModuleCtx, t: c_int, event: *const c_char, key: *mut rawmod::RedisModuleString) -> c_int {
+pub extern "C" fn handle_event(raw_ctx: *mut rawmod::RedisModuleCtx, _t: c_int, _event: *const c_char, key: *mut rawmod::RedisModuleString) -> c_int {
     let ctx = redis_module::Context::new(raw_ctx);
 
     let key_str = RedisString::from_ptr(key).unwrap();
