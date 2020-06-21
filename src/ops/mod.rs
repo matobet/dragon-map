@@ -13,6 +13,9 @@ pub use rem::Remove;
 pub use rem_by_index::RemoveByIndex;
 pub use set::Set;
 
+use std::fmt::Display;
+use lazy_format::prelude::*;
+
 const SEPARATOR: char = ':';
 const META_PREFIX: &str = "meta_";
 const INDEX_PREFIX: &str = "idx_";
@@ -70,12 +73,12 @@ trait Contextual {
     }
 
     fn smembers(&self, key: &str) -> Result<Vec<String>, RedisError> {
-        self.string_array_cmd("SMEMBERS", &[key], format!("Assertion failed: {} index was not a set!", key))
+        self.string_array_cmd("SMEMBERS", &[key], lazy_format!("Assertion failed: {} index was not a set!", key))
     }
 
     fn srandmember(&self, key: &str, n: usize) -> Result<Vec<String>, RedisError> {
         self.string_array_cmd("SRANDMEMBER", &[key, &n.to_string()],
-                              format!("Assertion failed: {} index was not a set!", key))
+                              lazy_format!("Assertion failed: {} index was not a set!", key))
     }
 
     fn srem(&self, key: &str, value: &str) -> Result<i64, RedisError> {
@@ -83,7 +86,7 @@ trait Contextual {
     }
 
     fn hgetall(&self, key: &str) -> Result<Vec<String>, RedisError> {
-        self.string_array_cmd("HGETALL", &[key], format!("Assertion failed: {} meta was not a map!", key))
+        self.string_array_cmd("HGETALL", &[key], lazy_format!("Assertion failed: {} meta was not a map!", key))
     }
 
     fn int_cmd(&self, cmd: &str, args: &[&str]) -> Result<i64, RedisError> {
@@ -94,11 +97,11 @@ trait Contextual {
         }
     }
 
-    fn string_array_cmd(&self, cmd: &str, args: &[&str], error_msg: String) -> Result<Vec<String>, RedisError> {
+    fn string_array_cmd(&self, cmd: &str, args: &[&str], error_msg: impl Display) -> Result<Vec<String>, RedisError> {
         if let RedisValue::Array(values) = self.context().call(cmd, args)? {
             Ok(extract_strings(values))
         } else {
-            Err(RedisError::from(error_msg))
+            Err(RedisError::from(error_msg.to_string()))
         }
     }
 }

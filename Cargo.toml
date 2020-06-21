@@ -12,3 +12,4 @@ name = "groomer"
 [dependencies]
 redis-module = { version = "0.9.0", features = ["experimental-api"]}
 itertools = "0.9"
+lazy_format = "1.7"
