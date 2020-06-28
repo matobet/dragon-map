@@ -30,24 +30,32 @@ impl<'a> RedisIterator<'a> {
                 return None
             }
 
-            let (next_cursor, batch) = match self.with_lock(|| {
-                self.ctx.call("SCAN", &[cursor, "MATCH", &self.pattern]).unwrap()
-            }) {
-                RedisValue::Array(mut outer) => {
-                    let next_cursor = outer.drain(..1).next().unwrap();
-                    match outer.drain(..).next().unwrap() {
-                        RedisValue::Array(keys) => (next_cursor, extract_strings(keys)),
-                        _ => panic!("SCAN return value's 2nd element should be an array!")
-                    }
-                }
-                _ => panic!("SCAN did not return a 2 element array!")
-            };
-            *cursor = is_string(next_cursor).unwrap();
+            let (next_cursor, batch) = Self::parse_scan(self.scan(&cursor).unwrap());
+            *cursor = next_cursor;
             if cursor == Self::INITIAL_CURSOR {
                 *cursor = "".to_string();
             }
             Some(batch)
         }).flatten()
+    }
+
+    fn scan(&self, cursor: &str) -> RedisResult {
+        self.with_lock(|| {
+            self.ctx.call("SCAN", &[cursor, "MATCH", &self.pattern])
+        })
+    }
+
+    fn parse_scan(ret: RedisValue) -> (String, Vec<String>) {
+        match ret {
+            RedisValue::Array(mut outer) => {
+                let next_cursor = outer.drain(..1).next().unwrap();
+                match outer.drain(..).next().unwrap() {
+                    RedisValue::Array(keys) => (is_string(next_cursor).unwrap(), extract_strings(keys)),
+                    _ => panic!("SCAN return value's 2nd element should be an array!")
+                }
+            }
+            _ => panic!("SCAN did not return a 2 element array!")
+        }
     }
 }
 
