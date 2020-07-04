@@ -363,6 +363,7 @@ dependencies = [
  "lazy_format",
  "redis",
  "redis-module",
+ "redis-test-macros",
 ]
 
 [[package]]
@@ -722,6 +723,14 @@ dependencies = [
  "enum-primitive-derive",
  "libc",
  "num-traits 0.2.11",
+]
+
+[[package]]
+name = "redis-test-macros"
+version = "0.1.0"
+dependencies = [
+ "quote 1.0.5",
+ "syn 1.0.32",
 ]
 
 [[package]]

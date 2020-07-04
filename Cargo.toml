@@ -17,3 +17,4 @@ lazy_format = "1.7"
 [dev-dependencies]
 redis = "0.16"
 redis-module = { version = "0.9", features = ["experimental-api", "test"] }
+redis-test-macros = { path = "redis-test-macros" }

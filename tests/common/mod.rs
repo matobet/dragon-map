@@ -1,11 +1,9 @@
-#![feature(const_if_match)]
-
-use std::collections::HashMap;
+use std::io::{BufRead, BufReader, Error, ErrorKind};
+use std::process::{Child, Command, Stdio};
+use std::sync::atomic::{AtomicUsize, Ordering};
 
 use redis::{Connection, RedisResult, Value};
-use std::process::{Command, Child, Stdio};
-use std::sync::atomic::{AtomicUsize, Ordering};
-use std::io::{BufReader, BufRead, Error, ErrorKind};
+pub use redis_test_macros::*;
 
 const TARGET_LIB: &'static str = "/target/debug/libgroomer.so";
 
