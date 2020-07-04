@@ -1,55 +1,69 @@
+#![feature(const_if_match)]
+
 use std::collections::HashMap;
 
 use redis::{Connection, RedisResult, Value};
+use std::process::{Command, Child, Stdio};
+use std::sync::atomic::{AtomicUsize, Ordering};
+use std::io::{BufReader, BufRead, Error, ErrorKind};
 
 const TARGET_LIB: &'static str = "/target/debug/libgroomer.so";
+
+const REDIS_BIN: Option<&'static str> = option_env!("REDIS_BIN");
 
 fn get_module_path() -> String {
     format!("{}{}", env!("CARGO_MANIFEST_DIR"), TARGET_LIB)
 }
 
-pub(crate) fn get_conn() -> RedisResult<Connection> {
-    let client = redis::Client::open("redis://127.0.0.1/")?;
-    client.get_connection()
+static TEST_REDIS_PORT_NUMBER: AtomicUsize = AtomicUsize::new(6380);
+
+struct ChildRedis { port: usize, child: Child }
+
+impl ChildRedis {
+    fn spawn() -> RedisResult<ChildRedis> {
+        let port = TEST_REDIS_PORT_NUMBER.fetch_add(1, Ordering::SeqCst);
+        let mut child = Command::new(REDIS_BIN.unwrap_or("/usr/bin/redis-server"))
+            .arg("--port").arg(port.to_string())
+            .stdout(Stdio::piped())
+            .spawn()?;
+
+        let stdout = child.stdout.as_mut().ok_or_else(|| Error::new(ErrorKind::Other, "Could not capture redis stdout"))?;
+        let reader = BufReader::new(stdout);
+
+        reader.lines()
+            .filter_map(|result| result.ok())
+            .find(|line| line.contains("Ready to accept connections"))
+            .ok_or_else(|| Error::new(ErrorKind::Other, "Redis failed to initialize"))?;
+
+        Ok(ChildRedis { port, child })
+    }
 }
 
-pub(crate) fn get_conn_with_loaded_module() -> RedisResult<Connection> {
-    let mut conn = get_conn()?;
-    redis::cmd("FLUSHALL").query(&mut conn)?;
-    ModuleLoader::new().ensure_loaded(&mut conn)?;
-    Ok(conn)
+impl Drop for ChildRedis {
+    fn drop(&mut self) {
+        self.child.kill();
+    }
+}
+
+pub(crate) fn with_redis_conn<F>(f: F) -> RedisResult<()>
+    where F : FnOnce(Connection) -> RedisResult<()> {
+    let redis = ChildRedis::spawn()?;
+    let conn = get_conn(redis.port)?;
+    f(conn)?;
+    Ok(())
+}
+
+pub(crate) fn get_conn(port: usize) -> RedisResult<Connection> {
+    let client = redis::Client::open(format!("redis://127.0.0.1:{port}/", port=port))?;
+    client.get_connection()
 }
 
 pub(crate) struct ModuleLoader {
     module_path: String
 }
 
-impl ModuleLoader {
-    pub fn new() -> ModuleLoader {
-        ModuleLoader { module_path: get_module_path() }
-    }
-
-    pub fn safe_unload(&self, conn: &mut Connection) -> RedisResult<()> {
-        let modules: Vec<HashMap<String, Value>> = redis::cmd("MODULE").arg("LIST").query(conn)?;
-        let already_loaded = modules.iter()
-            .map(|m| m.get("name"))
-            .any(|name| name == Some(&Value::Data("map".as_bytes().to_vec())));
-        if already_loaded {
-            redis::cmd("MODULE").arg("UNLOAD").arg("map").query::<bool>(conn)?;
-        }
-        Ok(())
-    }
-
-    pub fn load(&self, conn: &mut Connection) -> RedisResult<bool> {
-        redis::cmd("MODULE").arg("LOAD").arg(&self.module_path).query::<bool>(conn)
-    }
-
-    pub fn ensure_loaded(&self, conn: &mut Connection) -> RedisResult<()> {
-        self.safe_unload(conn)?;
-        self.load(conn)?;
-
-        Ok(())
-    }
+pub(crate) fn load_module(conn: &mut Connection) -> RedisResult<()> {
+    redis::cmd("MODULE").arg("LOAD").arg(get_module_path()).query(conn)
 }
 
 pub const METRICS_KEY_COUNT: usize = 4;
