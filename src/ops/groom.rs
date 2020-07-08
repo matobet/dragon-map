@@ -71,37 +71,22 @@ pub struct EventGroom<'a> {
     ctx: &'a Context,
     namespace: &'a str,
     key: &'a str,
-    is_meta: bool
 }
 
 impl<'a> EventGroom<'a> {
-    pub fn from(ctx: &'a Context, key_str: &'a str) -> Self {
-        let is_meta = key_str.starts_with("meta_");
-        let key = if is_meta {
-            &key_str[META_PREFIX.len()..]
-        } else {
-            key_str
-        };
-
+    pub fn from(ctx: &'a Context, key: &'a str) -> Self {
         let (namespace, key) = split_namespace(key);
-        Self { ctx, namespace, key, is_meta }
+        Self { ctx, namespace, key }
     }
 
     pub fn perform(&self) {
         self.incr("events").unwrap();
-        self.incr(if self.is_meta { "metas_expired" } else { "keys_expired" }).unwrap();
-        let exists_primary = self.is_meta && self.exists(&self.prefixed(self.key)).unwrap();
+        self.incr("keys_expired").unwrap();
 
         // clean_key ensures that meta is removed in case of key expiry
         // and vice versa that key is removed in case of meta expiry
         self.clean_key(&self.key)
             .unwrap_or_else(|e| self.ctx.log(LogLevel::Warning, &format!("Error grooming key [ {} ]: {}", self.key, e)));
-
-        // additionally in case of meta expiry we want to trigger the Targeted Groomer for this particular key
-        if exists_primary {
-            self.incr("targeteds").unwrap();
-            TargetedGroom::spawn(self.namespace.to_string(), self.key.to_string());
-        }
     }
 }
 
@@ -210,43 +195,3 @@ impl Namespaced for GroomIndex<'_> {
 }
 
 impl Threaded for GroomIndex<'_> {}
-
-struct TargetedGroom<'a> {
-    ctx: &'a Context,
-    namespace: String,
-    key: String
-}
-
-impl<'a> TargetedGroom<'a> {
-    fn spawn(namespace: String, key: String) {
-        Self::spawn_thread("Targeted Groomer", move |ctx| {
-            TargetedGroom { ctx, namespace, key }.perform()
-        })
-    }
-
-    fn perform(&self) {
-        for index in RedisIterator::of_namespace(self.ctx, Some(&self.namespace)).iter() {
-            self.with_lock(|| {
-                if self.exists(&self.key).unwrap() {
-                    // the key has reappeared in Redis, abort
-                    return
-                }
-                self.srem(&index, &self.key).unwrap();
-            })
-        }
-    }
-}
-
-impl Contextual for TargetedGroom<'_> {
-    fn context(&self) -> &Context {
-        self.ctx
-    }
-}
-
-impl Namespaced for TargetedGroom<'_> {
-    fn namespace(&self) -> &str {
-        &self.namespace
-    }
-}
-
-impl Threaded for TargetedGroom<'_> {}

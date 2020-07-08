@@ -64,4 +64,4 @@ pub(crate) fn load_module(conn: &mut Connection) -> RedisResult<()> {
     redis::cmd("MODULE").arg("LOAD").arg(get_module_path()).query(conn)
 }
 
-pub const METRICS_KEY_COUNT: usize = 4;
+pub const METRICS_KEY_COUNT: usize = 3;

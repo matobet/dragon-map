@@ -68,12 +68,6 @@ impl<'a> Set<'a> {
             let meta = self.prefixed_meta(key);
             interleaved.insert(0, &meta);
             self.ctx.call("HMSET", interleaved.as_slice())?;
-
-            // expire `meta` twice later than the main key so it is evicted before meta
-            // and thus has access to the index values
-            let expiry_num: usize = self.expiry.parse()?;
-            let expiry_double = (expiry_num * 2).to_string();
-            self.ctx.call("EXPIRE", &[&meta, &expiry_double])?;
         }
         REDIS_OK
     }

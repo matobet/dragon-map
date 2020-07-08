@@ -164,7 +164,6 @@ impl<'a> Init<'a> {
 
     pub fn perform(&self) {
         self.set("events", "0").unwrap();
-        self.set("metas_expired", "0").unwrap();
         self.set("keys_expired", "0").unwrap();
         self.set("meta_missing", "0").unwrap();
     }
