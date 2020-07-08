@@ -360,7 +360,6 @@ name = "groomer-rs"
 version = "0.1.0"
 dependencies = [
  "itertools",
- "lazy_format",
  "redis",
  "redis-module",
  "redis-test-macros",
@@ -446,12 +445,6 @@ checksum = "4ff57d6d215f7ca7eb35a9a64d656ba4d9d2bef114d741dc08048e75e2f5d418"
 dependencies = [
  "log",
 ]
-
-[[package]]
-name = "lazy_format"
-version = "1.7.4"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1fcbfa370488b9d46f50882230e38c0b9e1f7bf2e8aabb883540dfe2d5985008"
 
 [[package]]
 name = "lazy_static"

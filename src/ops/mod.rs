@@ -13,9 +13,6 @@ pub use rem::Remove;
 pub use rem_by_index::RemoveByIndex;
 pub use set::Set;
 
-use std::fmt::Display;
-use lazy_format::prelude::*;
-
 const SEPARATOR: char = ':';
 const META_PREFIX: &str = "meta_";
 const INDEX_PREFIX: &str = "idx_";
@@ -49,84 +46,104 @@ fn is_string(v: RedisValue) -> Option<String> {
     }
 }
 
-fn extract_strings(values: Vec<RedisValue>) -> Vec<String> {
-    let mut strings = vec![];
-    for val in values {
-        is_string(val).map(|s| strings.push(s));
+fn extract_strings(mut values: Vec<RedisValue>) -> Vec<String> {
+    values.drain(..).filter_map(is_string).collect()
+}
+
+trait IntoRedisResult<T> {
+    fn into_redis_result(self) -> Result<T, RedisError>;
+}
+
+impl IntoRedisResult<()> for RedisValue {
+    fn into_redis_result(self) -> Result<(), RedisError> {
+        Ok(())
     }
-    strings
+}
+
+impl IntoRedisResult<i64> for RedisValue {
+    fn into_redis_result(self) -> Result<i64, RedisError> {
+        if let RedisValue::Integer(n) = self {
+            Ok(n)
+        } else {
+            Err(RedisError::from(format!("command returned non-integer response!")))
+        }
+    }
+}
+
+impl IntoRedisResult<bool> for RedisValue {
+    fn into_redis_result(self) -> Result<bool, RedisError> {
+        self.into_redis_result().map(|n: i64| n == 1)
+    }
+}
+
+impl IntoRedisResult<Vec<String>> for RedisValue {
+    fn into_redis_result(self) -> Result<Vec<String>, RedisError> {
+        if let RedisValue::Array(values) = self {
+            Ok(extract_strings(values))
+        } else {
+            Err(RedisError::from(format!("command didn't return a list of strings!")))
+        }
+    }
 }
 
 trait Contextual {
     fn context(&self) -> &Context;
 
+    fn call<R>(&self, cmd: &str, args: &[&str]) -> Result<R, RedisError>
+        where RedisValue : IntoRedisResult<R> {
+        self.context().call(cmd, args)?.into_redis_result()
+    }
+
     fn exists(&self, key: &str) -> Result<bool, RedisError> {
-        self.int_cmd("EXISTS", &[key]).map(|n| n == 1)
+        self.call("EXISTS", &[key])
     }
 
     fn set(&self, key: &str, value: &str) -> Result<(), RedisError> {
-        self.context().call("SET", &[key, value]).map(|_|())
+        self.call("SET", &[key, value])
     }
 
     fn incr(&self, key: &str) -> Result<i64, RedisError> {
-        self.int_cmd("INCR", &[key])
+        self.call("INCR", &[key])
     }
 
     fn smembers(&self, key: &str) -> Result<Vec<String>, RedisError> {
-        self.string_array_cmd("SMEMBERS", &[key], lazy_format!("Assertion failed: {} index was not a set!", key))
+        self.call("SMEMBERS", &[key])
     }
 
     fn srandmember(&self, key: &str, n: usize) -> Result<Vec<String>, RedisError> {
-        self.string_array_cmd("SRANDMEMBER", &[key, &n.to_string()],
-                              lazy_format!("Assertion failed: {} index was not a set!", key))
+        self.call("SRANDMEMBER", &[key, &n.to_string()])
     }
 
     fn srem(&self, key: &str, value: &str) -> Result<i64, RedisError> {
-        self.int_cmd("SREM", &[key, value])
+        self.call("SREM", &[key, value])
     }
 
     fn hgetall(&self, key: &str) -> Result<Vec<String>, RedisError> {
-        self.string_array_cmd("HGETALL", &[key], lazy_format!("Assertion failed: {} meta was not a map!", key))
-    }
-
-    fn int_cmd(&self, cmd: &str, args: &[&str]) -> Result<i64, RedisError> {
-        if let RedisValue::Integer(n) = self.context().call(cmd, args)? {
-            Ok(n)
-        } else {
-            Err(RedisError::from(format!("{} returned non-integer response!", cmd)))
-        }
-    }
-
-    fn string_array_cmd(&self, cmd: &str, args: &[&str], error_msg: impl Display) -> Result<Vec<String>, RedisError> {
-        if let RedisValue::Array(values) = self.context().call(cmd, args)? {
-            Ok(extract_strings(values))
-        } else {
-            Err(RedisError::from(error_msg.to_string()))
-        }
+        self.call("HGETALL", &[key])
     }
 }
 
 trait CleanOperation: Contextual + Namespaced {
-    fn del(&self, key: &str) -> RedisResult {
-        self.context().call("DEL", &[key])
+    fn del(&self, key: &str) -> Result<bool, RedisError> {
+        self.call("DEL", &[key])
     }
 
-    fn clean_key(&self, key: &str) -> RedisResult {
+    fn clean_key(&self, key: &str) -> Result<(), RedisError> {
         self.del(&self.prefixed(key))?;
 
         let meta_key = self.prefixed_meta(key);
         let meta = self.hgetall(&meta_key)?;
         if meta.is_empty() {
             self.incr("meta_missing")?;
-            REDIS_OK
         } else {
             for pair in meta.chunks_exact(2) {
                 let idx = &pair[0];
                 let idx_val = &pair[1];
                 self.rm_from_index(key, idx, idx_val)?;
             }
-            self.del(&meta_key)
+            self.del(&meta_key)?;
         }
+        Ok(())
     }
 
     fn rm_from_index(&self, key: &str, idx: &str, idx_val: &str) -> RedisResult {

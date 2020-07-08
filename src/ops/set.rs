@@ -13,7 +13,7 @@ pub struct Set<'a> {
 }
 
 impl<'a> Set<'a> {
-    pub fn from(ctx: &'a Context, args: &'a [String]) -> Result<Set<'a>, RedisError> {
+    pub fn from(ctx: &'a Context, args: &'a [String]) -> Result<Self, RedisError> {
         if args.len() < 3 {
             return Err(RedisError::WrongArity);
         }
@@ -33,7 +33,7 @@ impl<'a> Set<'a> {
         let indices = &args[4..4 + index_count];
         let kv_index_lines = &args[4 + index_count..];
 
-        Ok(Set { ctx, namespace, expiry, indices, kv_index_lines })
+        Ok(Self { ctx, namespace, expiry, indices, kv_index_lines })
     }
 
     pub fn process(&self) -> RedisResult {
@@ -63,12 +63,11 @@ impl<'a> Set<'a> {
     }
 
     fn write_meta(&self, key: &str, index_values: &[String]) -> RedisResult {
-        let mut interleaved: Vec<&String> = interleave(self.indices, index_values).collect();
+        let mut interleaved: Vec<&str> = interleave(self.indices, index_values).map(|s| s.as_str()).collect();
         if !interleaved.is_empty() {
             let meta = self.prefixed_meta(key);
             interleaved.insert(0, &meta);
-            let index_args: Vec<&str> = interleaved.iter().map(AsRef::as_ref).collect();
-            self.ctx.call("HMSET", index_args.as_slice())?;
+            self.ctx.call("HMSET", interleaved.as_slice())?;
 
             // expire `meta` twice later than the main key so it is evicted before meta
             // and thus has access to the index values
@@ -79,12 +78,6 @@ impl<'a> Set<'a> {
         REDIS_OK
     }
 }
-
-// impl <U: AsRef<T>> AsRef<Vec<T>> for Vec<U> {
-//     fn as_ref(&self) -> &Vec<T> {
-//         self.iter().map(AsRef::as_ref).collect()
-//     }
-// }
 
 impl Namespaced for Set<'_> {
     fn namespace(&self) -> &str {

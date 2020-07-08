@@ -75,7 +75,7 @@ pub struct EventGroom<'a> {
 }
 
 impl<'a> EventGroom<'a> {
-    pub fn from(ctx: &'a Context, key_str: &'a str) -> EventGroom<'a> {
+    pub fn from(ctx: &'a Context, key_str: &'a str) -> Self {
         let is_meta = key_str.starts_with("meta_");
         let key = if is_meta {
             &key_str[META_PREFIX.len()..]
@@ -84,7 +84,7 @@ impl<'a> EventGroom<'a> {
         };
 
         let (namespace, key) = split_namespace(key);
-        EventGroom { ctx, namespace, key, is_meta }
+        Self { ctx, namespace, key, is_meta }
     }
 
     pub fn perform(&self) {
@@ -94,7 +94,7 @@ impl<'a> EventGroom<'a> {
 
         // clean_key ensures that meta is removed in case of key expiry
         // and vice versa that key is removed in case of meta expiry
-        self.clean_key(&self.key).map(|_| ())
+        self.clean_key(&self.key)
             .unwrap_or_else(|e| self.ctx.log(LogLevel::Warning, &format!("Error grooming key [ {} ]: {}", self.key, e)));
 
         // additionally in case of meta expiry we want to trigger the Targeted Groomer for this particular key
