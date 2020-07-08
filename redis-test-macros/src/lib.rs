@@ -4,11 +4,9 @@
 extern crate quote;
 extern crate syn;
 
-use syn::{AttributeArgs, ItemFn, FnArg, PatType, parse_macro_input, spanned::Spanned};
-use proc_macro::{TokenStream, Span};
-use std::any::Any;
+use syn::{AttributeArgs, ItemFn, FnArg, PatType, parse_macro_input};
+use proc_macro::{TokenStream};
 use std::ops::Deref;
-use proc_macro::TokenTree::Ident;
 
 #[proc_macro_attribute]
 pub fn redis_test(args: TokenStream, input: TokenStream) -> TokenStream {
@@ -63,7 +61,7 @@ pub fn redis_test(args: TokenStream, input: TokenStream) -> TokenStream {
         #[::core::prelude::v1::test]
         #(#attrs)*
         #vis fn #name() #ret {
-            with_redis_conn(|#params| {
+            with_redis_conn(stringify!(#name), |#params| {
                 #prelude
                 #body
             })

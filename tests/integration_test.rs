@@ -1,16 +1,16 @@
 extern crate redis;
 
 use std::collections::HashMap;
-use std::iter::Map;
-use std::path::{Path, PathBuf};
 use std::thread::sleep;
 use std::time::Duration;
 
 use itertools::Itertools;
-use redis::{Cmd, Commands, Connection, ConnectionLike, RedisResult, Value};
+use redis::{Commands, Connection, RedisResult};
 
 mod common;
 use common::*;
+use std::thread;
+use rand::Rng;
 
 #[redis_test]
 fn test_module_loads(mut conn: Connection) -> RedisResult<()> {
@@ -21,8 +21,7 @@ fn test_module_loads(mut conn: Connection) -> RedisResult<()> {
 fn test_groom_passes_on_empty_ks(mut conn: Connection) -> RedisResult<()> {
     redis::cmd("MAP.GROOM").query(&mut conn)?;
 
-    let keys_after: Vec<String> = conn.keys("*")?;
-    assert_eq!(keys_after.len(), METRICS_KEY_COUNT);
+    assert_keys_count(&mut conn, 0)?;
 
     Ok(())
 }
@@ -37,11 +36,9 @@ fn test_msetex_simple(mut conn: Connection) -> RedisResult<()> {
         .arg("v")
         .query(&mut conn)?;
 
-    let keys: Vec<String> = conn.keys("*")?;
-    assert_eq!(keys.len(), METRICS_KEY_COUNT + 1);
+    assert_keys_count(&mut conn, 1)?;
+    assert_key_value(&mut conn, "v","test_ns:k")?;
 
-    let value: String = conn.get("test_ns:k")?;
-    assert_eq!("v", value);
     Ok(())
 }
 
@@ -56,8 +53,7 @@ fn test_msetex_multival(mut conn: Connection) -> RedisResult<()> {
         .arg("k3").arg("v3")
         .query(&mut conn)?;
 
-    let keys: Vec<String> = conn.keys("*")?;
-    assert_eq!(keys.len(), METRICS_KEY_COUNT + 3);
+    assert_keys_count(&mut conn, 3)?;
 
     let values: Vec<String> = conn.get(vec!["test_ns:k1", "test_ns:k2", "test_ns:k3"])?;
     assert_eq!(vec!["v1", "v2", "v3"], values);
@@ -96,17 +92,10 @@ fn test_msetex_indexed(mut conn: Connection) -> RedisResult<()> {
     let values: Vec<String> = conn.get(vec!["test_ns:k1", "test_ns:k2"])?;
     assert_eq!(vec!["v1", "v2"], values);
 
-    let first_x_val: Vec<String> = conn.smembers("idx_test_ns:first:x")?;
-    assert_eq!(vec!["k1"], first_x_val);
-
-    let second_w_val: Vec<String> = conn.smembers("idx_test_ns:first:w")?;
-    assert_eq!(vec!["k2"], second_w_val);
-
-    let first_y_val: Vec<String> = conn.smembers("idx_test_ns:second:y")?;
-    assert_eq!(vec!["k1"], first_y_val);
-
-    let second_z_val: Vec<String> = conn.smembers("idx_test_ns:second:z")?;
-    assert_eq!(vec!["k2"], second_z_val);
+    assert_members(&mut conn, vec!["k1"], "idx_test_ns:first:x")?;
+    assert_members(&mut conn, vec!["k2"], "idx_test_ns:first:w")?;
+    assert_members(&mut conn, vec!["k1"], "idx_test_ns:second:y")?;
+    assert_members(&mut conn, vec!["k2"], "idx_test_ns:second:z")?;
 
     let meta_k1: HashMap<String, String> = conn.hgetall("meta_test_ns:k1")?;
     assert_eq!(vec!["first", "second"], meta_k1.keys().sorted().collect::<Vec<&String>>());
@@ -119,6 +108,87 @@ fn test_msetex_indexed(mut conn: Connection) -> RedisResult<()> {
 
     assert_eq!("w", meta_k2.get("first").unwrap());
     assert_eq!("z", meta_k2.get("second").unwrap());
+
+    Ok(())
+}
+
+#[redis_test(loaded_module)]
+fn test_msetex_indexed_update(mut conn: Connection) -> RedisResult<()> {
+    redis::cmd("MAP.MSETEX_INDEXED")
+        .arg("test_ns")
+        .arg(10)
+        .arg(2).arg("first").arg("second")
+        .arg("k").arg("v").arg("x").arg("y")
+        .query(&mut conn)?;
+
+    redis::cmd("MAP.MSETEX_INDEXED")
+        .arg("test_ns")
+        .arg(10)
+        .arg(2).arg("second").arg("third")
+        .arg("k").arg("v").arg("y2").arg("z")
+        .query(&mut conn)?;
+
+    assert_key_value(&mut conn, "v", "test_ns:k")?;
+
+    assert!(!conn.exists("idx_test_ns:first:x")?);
+    assert!(!conn.exists("idx_test_ns:second:y")?);
+    assert_members(&mut conn, vec!["k"], "idx_test_ns:second:y2")?;
+    assert_members(&mut conn, vec!["k"], "idx_test_ns:third:z")?;
+
+    Ok(())
+}
+
+#[redis_test(loaded_module)]
+fn test_msetex_index_unique_validation(mut conn: Connection) -> RedisResult<()> {
+    match redis::cmd("MAP.MSETEX_INDEXED")
+        .arg("test_ns")
+        .arg(1)
+        .arg(3).arg("duplicate").arg("duplicate").arg("third")
+        .arg("k").arg("v").arg("x").arg("y").arg("z")
+        .query(&mut conn) {
+        Ok(()) => panic!("Expected validation failure"),
+        Err(err) => assert_eq!(Some("index names must be unique!"), err.detail())
+    }
+
+    Ok(())
+}
+
+#[redis_test(loaded_module)]
+fn test_msetex_indexed_load(mut conn: Connection) -> RedisResult<()> {
+    for i in 1 .. 10_000 {
+        redis::cmd("MAP.MSETEX_INDEXED")
+            .arg("test_ns")
+            .arg(1)
+            .arg(3).arg("first").arg("second").arg("third")
+            .arg(format!("k{}", i)).arg(format!("v{}", i)).arg(format!("{}", i / 2)).arg(format!("{}", i / 3)).arg(format!("{}", i / 4))
+            .query(&mut conn)?;
+    }
+
+    thread::sleep(Duration::from_secs(5));
+
+    assert_keys_count(&mut conn, 0)?;
+
+    Ok(())
+}
+
+#[redis_test(loaded_module)]
+fn test_msetex_indexed_randomized(mut conn: Connection) -> RedisResult<()> {
+    let mut rng = rand::thread_rng();
+
+    for i in 1 .. 10_000 {
+        let idx_base = rng.gen_range(0, 1000);
+        redis::cmd("MAP.MSETEX_INDEXED")
+            .arg("test_ns")
+            .arg(1)
+            .arg(3).arg(idx_base).arg(idx_base + 1).arg(idx_base + 2)
+            .arg(format!("{}", rng.gen_range(0, 1000)))
+            .arg(format!("v{}", i)).arg(rng.gen_range(0, 100)).arg(rng.gen_range(0, 100)).arg(rng.gen_range(0, 100))
+            .query(&mut conn)?;
+    }
+
+    thread::sleep(Duration::from_secs(5));
+
+    assert_keys_count(&mut conn, 0)?;
 
     Ok(())
 }

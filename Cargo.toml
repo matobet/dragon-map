@@ -14,6 +14,7 @@ redis-module = { version = "0.9", features = ["experimental-api"] }
 itertools = "0.9"
 
 [dev-dependencies]
+rand = "0.7"
 redis = "0.16"
 redis-module = { version = "0.9", features = ["experimental-api", "test"] }
 redis-test-macros = { path = "redis-test-macros" }

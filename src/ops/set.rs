@@ -1,6 +1,6 @@
 use redis_module::{Context, RedisError, RedisResult, REDIS_OK};
 
-use itertools::interleave;
+use itertools::{interleave, Itertools};
 
 use super::*;
 
@@ -31,6 +31,10 @@ impl<'a> Set<'a> {
         }
 
         let indices = &args[4..4 + index_count];
+        if indices.len() != indices.iter().unique().count() {
+            return Err(RedisError::from("ERR index names must be unique!"));
+        }
+
         let kv_index_lines = &args[4 + index_count..];
 
         Ok(Self { ctx, namespace, expiry, indices, kv_index_lines })
@@ -48,6 +52,11 @@ impl<'a> Set<'a> {
         let key = &kv_index_line[0];
         let value = &kv_index_line[1];
         let index_values = &kv_index_line[2..];
+
+        // in case old value is present we need to make sure old index values are cleared
+        if self.exists(&self.prefixed_meta(key))? {
+            self.clean_key(key)?;
+        }
 
         self.ctx.call("SETEX", &[&self.prefixed(key), self.expiry, value])?;
 
@@ -84,3 +93,5 @@ impl Contextual for Set<'_> {
         self.ctx
     }
 }
+
+impl CleanOperation for Set<'_> {}
