@@ -24,9 +24,7 @@ impl<'a> Get<'a> {
 
     pub fn process(&self) -> RedisResult {
         let idx_key = &self.prefixed_idx(self.idx, self.idx_val);
-        // self.ctx.log_debug(&format!("Invoking SMEMBERS for {}", idx_key));
         let keys = self.smembers(idx_key)?;
-        // self.ctx.log_debug(&format!("SMEMBERS returned {:?}", keys));
         if keys.is_empty() {
             Ok(RedisValue::Array(vec![]))
         } else {

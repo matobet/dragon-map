@@ -1,5 +1,5 @@
 [package]
-name = "groomer-rs"
+name = "dragon_map"
 version = "0.1.0"
 authors = ["Martin Betak <matobet@gmail.com>"]
 edition = "2018"
@@ -7,7 +7,7 @@ edition = "2018"
 
 [lib]
 crate-type = ["cdylib"]
-name = "groomer"
+name = "dragon_map"
 
 [dependencies]
 redis-module = { version = "0.9", features = ["experimental-api"] }

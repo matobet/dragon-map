@@ -6,7 +6,7 @@ use redis::{Commands, Connection, RedisResult};
 pub use redis_test_macros::*;
 use std::io;
 
-const TARGET_LIB: &'static str = "/target/debug/libgroomer.so";
+const TARGET_LIB: &'static str = "/target/debug/libdragon_map.so";
 
 const REDIS_BIN: Option<&'static str> = option_env!("REDIS_BIN");
 

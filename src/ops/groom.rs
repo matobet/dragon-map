@@ -165,7 +165,6 @@ impl GroomIndex<'_> {
     const BATCH_SIZE: usize = 256;
 
     fn perform(&self) -> RedisResult {
-        // self.ctx.log_debug(&format!("Grooming {}", self.index));
         let keys = self.with_lock(|| self.srandmember(self.index, Self::BATCH_SIZE))?;
         for key in &keys {
             self.with_lock(|| {

@@ -7,6 +7,7 @@ use redis_module::{Context, raw as rawmod, RedisError, RedisResult, RedisString,
 
 mod ops;
 
+// TODO: get rid of when https://github.com/RedisLabsModules/redismodule-rs/pull/78 is merged
 pub extern "C" fn handle_event(raw_ctx: *mut rawmod::RedisModuleCtx, _t: c_int, _event: *const c_char, key: *mut rawmod::RedisModuleString) -> c_int {
     let ctx = redis_module::Context::new(raw_ctx);
 
