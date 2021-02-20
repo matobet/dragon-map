@@ -2,71 +2,6 @@ use redis_module::{Context, LogLevel};
 
 use super::*;
 
-struct RedisIterator<'a> {
-    ctx: &'a Context,
-    pattern: String
-}
-
-impl<'a> RedisIterator<'a> {
-
-    const INITIAL_CURSOR: &'static str = "0";
-
-    fn of(ctx: &'a Context) -> Self {
-        Self::of_namespace(ctx, None)
-    }
-
-    fn of_namespace(ctx: &'a Context, namespace: Option<&'a str>) -> Self {
-        let pattern = match namespace {
-            Some(ns) => format!("{prefix}{namespace}*", prefix = INDEX_PREFIX, namespace = ns),
-            None => format!("{prefix}*", prefix = INDEX_PREFIX)
-        };
-
-        RedisIterator { ctx, pattern }
-    }
-
-    fn iter<'b : 'a>(&'b self) -> impl Iterator<Item = String> + 'b {
-        unfold(Self::INITIAL_CURSOR.to_string(), move |cursor| {
-            if cursor.is_empty() {
-                return None
-            }
-
-            let (next_cursor, batch) = Self::parse_scan(self.scan(&cursor).unwrap());
-            *cursor = next_cursor;
-            if cursor == Self::INITIAL_CURSOR {
-                *cursor = "".to_string();
-            }
-            Some(batch)
-        }).flatten()
-    }
-
-    fn scan(&self, cursor: &str) -> RedisResult {
-        self.with_lock(|| {
-            self.ctx.call("SCAN", &[cursor, "MATCH", &self.pattern])
-        })
-    }
-
-    fn parse_scan(ret: RedisValue) -> (String, Vec<String>) {
-        match ret {
-            RedisValue::Array(mut outer) => {
-                let next_cursor = outer.drain(..1).next().unwrap();
-                match outer.drain(..).next().unwrap() {
-                    RedisValue::Array(keys) => (is_string(next_cursor).unwrap(), extract_strings(keys)),
-                    _ => panic!("SCAN return value's 2nd element should be an array!")
-                }
-            }
-            _ => panic!("SCAN did not return a 2 element array!")
-        }
-    }
-}
-
-impl Contextual for RedisIterator<'_> {
-    fn context(&self) -> &Context {
-        self.ctx
-    }
-}
-
-impl Threaded for RedisIterator<'_> {}
-
 pub struct EventGroom<'a> {
     ctx: &'a Context,
     namespace: &'a str,
@@ -85,8 +20,10 @@ impl<'a> EventGroom<'a> {
 
         // clean_key ensures that meta is removed in case of key expiry
         // and vice versa that key is removed in case of meta expiry
-        self.clean_key(&self.key)
-            .unwrap_or_else(|e| self.ctx.log(LogLevel::Warning, &format!("Error grooming key [ {} ]: {}", self.key, e)));
+        self.clean_key(&self.key).unwrap_or_else(|e| {
+            self.ctx
+                .log(LogLevel::Warning, &format!("Error grooming key [ {} ]: {}", self.key, e))
+        });
     }
 }
 
@@ -103,94 +40,3 @@ impl Contextual for EventGroom<'_> {
 }
 
 impl CleanOperation for EventGroom<'_> {}
-
-use redis_module::RedisValue;
-use std::time::Instant;
-use itertools::unfold;
-
-pub struct PeriodicGroom<'a> {
-    ctx: &'a Context
-}
-
-trait Threaded: Contextual {
-    fn spawn_thread<F>(name: &'static str, f: F) where F: FnOnce(&Context) + Send + 'static {
-        std::thread::spawn( move || {
-            let ctx = &Context::get_thread_safe_context();
-            ctx.log_debug(&format!("Starting {} Thread", name));
-            let start = Instant::now();
-            f(ctx);
-            ctx.log_debug(&format!("Finishing {} Thread in {:?}", name, start.elapsed()));
-        });
-    }
-
-    fn with_lock<F, T>(&self, f: F) -> T where F : FnOnce() -> T {
-        self.context().lock();
-        let ret = f();
-        self.context().unlock();
-        ret
-    }
-}
-
-impl<'a> PeriodicGroom<'a> {
-    pub fn spawn() {
-        Self::spawn_thread("Groomer", |ctx| {
-            PeriodicGroom { ctx }.perform();
-        });
-    }
-
-    fn perform(&mut self) {
-        for index in RedisIterator::of(self.ctx).iter() {
-            let parts: Vec<&str> = index[INDEX_PREFIX.len()..].split(SEPARATOR).collect();
-            let namespace = parts[0];
-            GroomIndex { ctx: self.ctx, namespace, index: &index }.perform().unwrap();
-        }
-    }
-}
-
-impl Contextual for PeriodicGroom<'_> {
-    fn context(&self) -> &Context {
-        self.ctx
-    }
-}
-
-impl Threaded for PeriodicGroom<'_> {}
-
-struct GroomIndex<'a> {
-    ctx: &'a Context,
-    namespace: &'a str,
-    index: &'a str
-}
-
-impl GroomIndex<'_> {
-    const BATCH_SIZE: usize = 256;
-
-    fn perform(&self) -> RedisResult {
-        let keys = self.with_lock(|| self.srandmember(self.index, Self::BATCH_SIZE))?;
-        for key in &keys {
-            self.with_lock(|| {
-                if !self.exists(&self.prefixed(key))? {
-                    if cfg!(debug_assertions) {
-                        self.ctx.log_debug(&format!("{} does not exist. Removing {}", self.prefixed(key), key));
-                    }
-                    self.srem(self.index, key)?;
-                }
-                REDIS_OK
-            })?;
-        }
-        REDIS_OK
-    }
-}
-
-impl Contextual for GroomIndex<'_> {
-    fn context(&self) -> &Context {
-        self.ctx
-    }
-}
-
-impl Namespaced for GroomIndex<'_> {
-    fn namespace(&self) -> &str {
-        &self.namespace
-    }
-}
-
-impl Threaded for GroomIndex<'_> {}

@@ -9,7 +9,7 @@ pub struct Set<'a> {
     namespace: &'a String,
     expiry: &'a String,
     indices: &'a [String],
-    kv_index_lines: &'a [String]
+    kv_index_lines: &'a [String],
 }
 
 impl<'a> Set<'a> {
@@ -32,12 +32,18 @@ impl<'a> Set<'a> {
 
         let indices = &args[4..4 + index_count];
         if indices.len() != indices.iter().unique().count() {
-            return Err(RedisError::from("ERR index names must be unique!"));
+            return Err(RedisError::Str("ERR index names must be unique!"));
         }
 
         let kv_index_lines = &args[4 + index_count..];
 
-        Ok(Self { ctx, namespace, expiry, indices, kv_index_lines })
+        Ok(Self {
+            ctx,
+            namespace,
+            expiry,
+            indices,
+            kv_index_lines,
+        })
     }
 
     pub fn process(&self) -> RedisResult {

@@ -6,7 +6,7 @@ use redis::{Commands, Connection, RedisResult};
 pub use redis_test_macros::*;
 use std::io;
 
-const TARGET_LIB: &'static str = "/target/debug/libdragon_map.so";
+const TARGET_LIB: &str = "/target/debug/libdragon_map.so";
 
 const REDIS_BIN: Option<&'static str> = option_env!("REDIS_BIN");
 
@@ -16,28 +16,40 @@ fn get_module_path() -> String {
 
 static TEST_REDIS_PORT_NUMBER: AtomicUsize = AtomicUsize::new(6380);
 
-struct ChildRedis { port: usize, child: Child }
+struct ChildRedis {
+    port: usize,
+    child: Child,
+}
 
 impl ChildRedis {
     fn spawn(name: &str) -> RedisResult<ChildRedis> {
         let port = TEST_REDIS_PORT_NUMBER.fetch_add(1, Ordering::SeqCst);
         let log_file = ChildRedis::get_log_file(name)?;
         let child = Command::new(REDIS_BIN.unwrap_or("/usr/bin/redis-server"))
-            .arg("--port").arg(port.to_string())
-            .arg("--logfile").arg(&log_file)
-            .arg("--maxmemory-policy").arg("volatile-lru")
+            .arg("--port")
+            .arg(port.to_string())
+            .arg("--logfile")
+            .arg(&log_file)
+            .arg("--maxmemory-policy")
+            .arg("volatile-lru")
             .spawn()?;
 
         let log_tail = Command::new("/usr/bin/tail")
-            .arg("-F").arg(&log_file)
-            .arg("--sleep-interval").arg("0.1")
+            .arg("-F")
+            .arg(&log_file)
+            .arg("--sleep-interval")
+            .arg("0.1")
             .stderr(Stdio::null())
-            .stdout(Stdio::piped()).spawn()?;
+            .stdout(Stdio::piped())
+            .spawn()?;
 
-        let stdout = log_tail.stdout.ok_or_else(|| Error::new(ErrorKind::Other, "Could not capture redis logs"))?;
+        let stdout = log_tail
+            .stdout
+            .ok_or_else(|| Error::new(ErrorKind::Other, "Could not capture redis logs"))?;
         let reader = BufReader::new(stdout);
 
-        reader.lines()
+        reader
+            .lines()
             .filter_map(|result| result.ok())
             .find(|line| line.contains("Ready to accept connections"))
             .ok_or_else(|| Error::new(ErrorKind::Other, "Redis failed to initialize"))?;
@@ -60,15 +72,16 @@ impl Drop for ChildRedis {
 }
 
 pub(crate) fn with_redis_conn<F>(name: &str, f: F) -> RedisResult<()>
-    where F : FnOnce(Connection) -> RedisResult<()> {
+where
+    F: FnOnce(Connection) -> RedisResult<()>,
+{
     let redis = ChildRedis::spawn(name)?;
     let conn = get_conn(redis.port)?;
-    f(conn)?;
-    Ok(())
+    f(conn)
 }
 
 pub(crate) fn get_conn(port: usize) -> RedisResult<Connection> {
-    let client = redis::Client::open(format!("redis://127.0.0.1:{port}/", port=port))?;
+    let client = redis::Client::open(format!("redis://127.0.0.1:{port}/", port = port))?;
     client.get_connection()
 }
 

@@ -1,4 +1,4 @@
-use redis_module::{RedisValue, Context, RedisError, RedisResult, REDIS_OK};
+use redis_module::{Context, RedisError, RedisResult, RedisValue, REDIS_OK};
 
 mod get;
 mod groom;
@@ -8,7 +8,6 @@ mod set;
 
 pub use get::Get;
 pub use groom::EventGroom;
-pub use groom::PeriodicGroom;
 pub use rem::Remove;
 pub use rem_by_index::RemoveByIndex;
 pub use set::Set;
@@ -25,11 +24,24 @@ trait Namespaced {
     }
 
     fn prefixed_meta(&self, key: &str) -> String {
-        format!("{meta}{}{separator}{}", self.namespace(), key, meta = META_PREFIX, separator = SEPARATOR)
+        format!(
+            "{meta}{}{separator}{}",
+            self.namespace(),
+            key,
+            meta = META_PREFIX,
+            separator = SEPARATOR
+        )
     }
 
     fn prefixed_idx(&self, idx: &str, idx_val: &str) -> String {
-        format!("{index}{}{separator}{}{separator}{}", self.namespace(), idx, idx_val, index = INDEX_PREFIX, separator = SEPARATOR)
+        format!(
+            "{index}{}{separator}{}{separator}{}",
+            self.namespace(),
+            idx,
+            idx_val,
+            index = INDEX_PREFIX,
+            separator = SEPARATOR
+        )
     }
 }
 
@@ -42,7 +54,7 @@ fn is_string(v: RedisValue) -> Option<String> {
     match v {
         RedisValue::SimpleString(s) => Some(s),
         RedisValue::BulkString(s) => Some(s),
-        _ => None
+        _ => None,
     }
 }
 
@@ -65,7 +77,7 @@ impl IntoRedisResult<i64> for RedisValue {
         if let RedisValue::Integer(n) = self {
             Ok(n)
         } else {
-            Err(RedisError::from(format!("command returned non-integer response!")))
+            Err(RedisError::String(format!("command returned non-integer response!")))
         }
     }
 }
@@ -81,7 +93,7 @@ impl IntoRedisResult<Vec<String>> for RedisValue {
         if let RedisValue::Array(values) = self {
             Ok(extract_strings(values))
         } else {
-            Err(RedisError::from(format!("command didn't return a list of strings!")))
+            Err(RedisError::String(format!("command didn't return a list of strings!")))
         }
     }
 }
@@ -90,7 +102,9 @@ trait Contextual {
     fn context(&self) -> &Context;
 
     fn call<R>(&self, cmd: &str, args: &[&str]) -> Result<R, RedisError>
-        where RedisValue : IntoRedisResult<R> {
+    where
+        RedisValue: IntoRedisResult<R>,
+    {
         self.context().call(cmd, args)?.into_redis_result()
     }
 
@@ -154,7 +168,7 @@ trait CleanOperation: Contextual + Namespaced {
 }
 
 pub struct Init<'a> {
-    ctx: &'a Context
+    ctx: &'a Context,
 }
 
 impl<'a> Init<'a> {

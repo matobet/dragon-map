@@ -3,13 +3,13 @@ use super::*;
 pub struct Remove<'a> {
     ctx: &'a Context,
     namespace: &'a String,
-    keys: &'a [String]
+    keys: &'a [String],
 }
 
 impl<'a> Remove<'a> {
     pub fn from(ctx: &'a Context, args: &'a [String]) -> Result<Remove<'a>, RedisError> {
         if args.len() < 2 {
-            return Err(RedisError::WrongArity)
+            return Err(RedisError::WrongArity);
         }
 
         let namespace = &args[1];

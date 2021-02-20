@@ -1,4 +1,4 @@
-use redis_module::{RedisValue, RedisError, Context, RedisResult};
+use redis_module::{Context, RedisError, RedisResult, RedisValue};
 
 use super::*;
 
@@ -6,7 +6,7 @@ pub struct Get<'a> {
     ctx: &'a Context,
     namespace: &'a String,
     idx: &'a String,
-    idx_val: &'a String
+    idx_val: &'a String,
 }
 
 impl<'a> Get<'a> {
@@ -19,7 +19,12 @@ impl<'a> Get<'a> {
         let idx = &args[2];
         let idx_val = &args[3];
 
-        Ok(Get { ctx, namespace, idx, idx_val })
+        Ok(Get {
+            ctx,
+            namespace,
+            idx,
+            idx_val,
+        })
     }
 
     pub fn process(&self) -> RedisResult {

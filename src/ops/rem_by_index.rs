@@ -6,7 +6,7 @@ pub struct RemoveByIndex<'a> {
     ctx: &'a Context,
     namespace: &'a String,
     idx: &'a String,
-    idx_val: &'a String
+    idx_val: &'a String,
 }
 
 impl<'a> RemoveByIndex<'a> {
@@ -19,7 +19,12 @@ impl<'a> RemoveByIndex<'a> {
         let idx = &args[2];
         let idx_val = &args[3];
 
-        Ok(RemoveByIndex { ctx, namespace, idx, idx_val })
+        Ok(RemoveByIndex {
+            ctx,
+            namespace,
+            idx,
+            idx_val,
+        })
     }
 
     pub fn process(&self) -> RedisResult {
