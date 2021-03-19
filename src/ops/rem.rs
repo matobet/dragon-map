@@ -7,7 +7,7 @@ pub struct Remove<'a> {
 }
 
 impl<'a> Remove<'a> {
-    pub fn from(ctx: &'a Context, args: &'a [String]) -> Result<Remove<'a>, RedisError> {
+    pub fn from(ctx: &'a Context, args: &'a [String]) -> Result<Self, RedisError> {
         if args.len() < 2 {
             return Err(RedisError::WrongArity);
         }

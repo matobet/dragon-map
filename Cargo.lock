@@ -447,9 +447,9 @@ dependencies = [
 
 [[package]]
 name = "redis-module"
-version = "0.12.0"
+version = "0.13.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "dbee492d367d4e0b81b448005da4a2992b4ccd42ec0ddc0b09871874b5fe8a9c"
+checksum = "8edf66de138560757f7adb8328f628bdefc1e0243605272491af19e97f5e6a6a"
 dependencies = [
  "bindgen",
  "bitflags",

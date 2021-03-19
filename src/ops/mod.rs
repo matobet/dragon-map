@@ -172,8 +172,8 @@ pub struct Init<'a> {
 }
 
 impl<'a> Init<'a> {
-    pub fn from(ctx: &'a Context) -> Init<'a> {
-        Init { ctx }
+    pub fn from(ctx: &'a Context) -> Self {
+        Self { ctx }
     }
 
     pub fn perform(&self) {

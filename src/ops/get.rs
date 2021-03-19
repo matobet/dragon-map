@@ -10,7 +10,7 @@ pub struct Get<'a> {
 }
 
 impl<'a> Get<'a> {
-    pub fn from(ctx: &'a Context, args: &'a [String]) -> Result<Get<'a>, RedisError> {
+    pub fn from(ctx: &'a Context, args: &'a [String]) -> Result<Self, RedisError> {
         if args.len() != 4 {
             return Err(RedisError::WrongArity);
         }

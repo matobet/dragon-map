@@ -1,9 +1,7 @@
 #[macro_use]
 extern crate redis_module;
 
-use std::os::raw::c_int;
-
-use redis_module::{raw as rawmod, Context, NotifyEvent, RedisResult};
+use redis_module::{Context, NotifyEvent, RedisResult, Status};
 
 mod ops;
 
@@ -15,10 +13,10 @@ fn on_event(ctx: &Context, _event_type: NotifyEvent, _event: &str, key: &str) {
     ops::EventGroom::from(&ctx, key).perform();
 }
 
-fn init(raw_ctx: *mut rawmod::RedisModuleCtx) -> c_int {
-    ops::Init::from(&redis_module::Context::new(raw_ctx)).perform();
+fn init(ctx: &Context, _args: &Vec<String>) -> Status {
+    ops::Init::from(ctx).perform();
 
-    rawmod::REDISMODULE_OK as c_int
+    Status::Ok
 }
 
 // MAP.MSETEX <namespace> <expiry> <num_indices> <idx_1> <idx_2> ... <idx_n>
