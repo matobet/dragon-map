@@ -1,23 +1,21 @@
-use redis_module::{Context, RedisError, RedisResult, RedisValue};
+use redis_module::{Context, NextArg, RedisError, RedisResult, RedisString, RedisValue};
 
 use super::*;
 
 pub struct RemoveByIndex<'a> {
     ctx: &'a Context,
-    namespace: &'a String,
-    idx: &'a String,
-    idx_val: &'a String,
+    namespace: String,
+    idx: String,
+    idx_val: String,
 }
 
 impl<'a> RemoveByIndex<'a> {
-    pub fn from(ctx: &'a Context, args: &'a [String]) -> Result<Self, RedisError> {
-        if args.len() != 4 {
-            return Err(RedisError::WrongArity);
-        }
+    pub fn from(ctx: &'a Context, args: Vec<RedisString>) -> Result<Self, RedisError> {
+        let mut args = args.into_iter().skip(1);
 
-        let namespace = &args[1];
-        let idx = &args[2];
-        let idx_val = &args[3];
+        let namespace = args.next_string()?;
+        let idx = args.next_string()?;
+        let idx_val = args.next_string()?;
 
         Ok(RemoveByIndex {
             ctx,
@@ -28,7 +26,7 @@ impl<'a> RemoveByIndex<'a> {
     }
 
     pub fn process(&self) -> RedisResult {
-        let idx_key = &self.prefixed_idx(self.idx, self.idx_val);
+        let idx_key = &self.prefixed_idx(&self.idx, &self.idx_val);
         let keys = self.smembers(idx_key)?;
         if keys.is_empty() {
             Ok(RedisValue::Array(vec![]))
@@ -43,7 +41,7 @@ impl<'a> RemoveByIndex<'a> {
 
 impl Namespaced for RemoveByIndex<'_> {
     fn namespace(&self) -> &str {
-        self.namespace
+        &self.namespace
     }
 }
 

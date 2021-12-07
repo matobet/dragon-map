@@ -1,4 +1,4 @@
-use redis_module::{Context, RedisError, RedisResult, REDIS_OK};
+use redis_module::{Context, NextArg, RedisError, RedisResult, RedisString, REDIS_OK};
 
 use itertools::{interleave, Itertools};
 
@@ -6,36 +6,34 @@ use super::*;
 
 pub struct Set<'a> {
     ctx: &'a Context,
-    namespace: &'a String,
-    expiry: &'a String,
-    indices: &'a [String],
-    kv_index_lines: &'a [String],
+    namespace: String,
+    expiry: String,
+    indices: Vec<String>,
+    kv_index_lines: Vec<String>,
 }
 
 impl<'a> Set<'a> {
-    pub fn from(ctx: &'a Context, args: &'a [String]) -> Result<Self, RedisError> {
-        if args.len() < 3 {
+    pub fn from(ctx: &'a Context, args: Vec<RedisString>) -> Result<Self, RedisError> {
+        let mut args = args.into_iter().skip(1);
+
+        let namespace = args.next_string()?;
+        let expiry = args.next_string()?;
+        let index_count = args.next_u64()? as usize;
+
+        if args.len() < index_count {
             return Err(RedisError::WrongArity);
         }
 
-        let namespace = &args[1];
-        let expiry = &args[2];
-        let index_count = args[3].parse()?;
-
-        if args.len() - 4 < index_count {
+        if (args.len() - index_count) % (index_count + 2) != 0 {
             return Err(RedisError::WrongArity);
         }
 
-        if (args.len() - 4 - index_count) % (index_count + 2) != 0 {
-            return Err(RedisError::WrongArity);
-        }
-
-        let indices = &args[4..4 + index_count];
+        let indices = (&mut args).take(index_count).map_into().collect_vec();
         if indices.len() != indices.iter().unique().count() {
             return Err(RedisError::Str("ERR index names must be unique!"));
         }
 
-        let kv_index_lines = &args[4 + index_count..];
+        let kv_index_lines = args.map_into().collect_vec();
 
         Ok(Self {
             ctx,
@@ -64,7 +62,7 @@ impl<'a> Set<'a> {
             self.clean_key(key)?;
         }
 
-        self.ctx.call("SETEX", &[&self.prefixed(key), self.expiry, value])?;
+        self.ctx.call("SETEX", &[&self.prefixed(key), &self.expiry, value])?;
 
         for (idx, idx_val) in self.indices.iter().zip(index_values) {
             self.add_to_index(key, idx, idx_val)?;
@@ -78,7 +76,7 @@ impl<'a> Set<'a> {
     }
 
     fn write_meta(&self, key: &str, index_values: &[String]) -> RedisResult {
-        let mut interleaved: Vec<&str> = interleave(self.indices, index_values).map(|s| s.as_str()).collect();
+        let mut interleaved = interleave(&self.indices, index_values).map(|s| s.as_str()).collect_vec();
         if !interleaved.is_empty() {
             let meta = self.prefixed_meta(key);
             interleaved.insert(0, &meta);
@@ -90,7 +88,7 @@ impl<'a> Set<'a> {
 
 impl Namespaced for Set<'_> {
     fn namespace(&self) -> &str {
-        self.namespace
+        &self.namespace
     }
 }
 

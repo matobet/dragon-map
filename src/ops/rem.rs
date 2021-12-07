@@ -1,25 +1,26 @@
+use itertools::Itertools;
+use redis_module::{NextArg, RedisString};
+
 use super::*;
 
 pub struct Remove<'a> {
     ctx: &'a Context,
-    namespace: &'a String,
-    keys: &'a [String],
+    namespace: String,
+    keys: Vec<String>,
 }
 
 impl<'a> Remove<'a> {
-    pub fn from(ctx: &'a Context, args: &'a [String]) -> Result<Self, RedisError> {
-        if args.len() < 2 {
-            return Err(RedisError::WrongArity);
-        }
+    pub fn from(ctx: &'a Context, args: Vec<RedisString>) -> Result<Self, RedisError> {
+        let mut args = args.into_iter().skip(1);
 
-        let namespace = &args[1];
-        let keys = &args[2..];
+        let namespace = args.next_string()?;
+        let keys = args.map_into().collect_vec();
 
         Ok(Remove { ctx, namespace, keys })
     }
 
     pub fn process(&self) -> RedisResult {
-        for key in self.keys {
+        for key in &self.keys {
             self.clean_key(key)?;
         }
         Ok(RedisValue::Integer(self.keys.len() as i64))
@@ -28,7 +29,7 @@ impl<'a> Remove<'a> {
 
 impl Namespaced for Remove<'_> {
     fn namespace(&self) -> &str {
-        self.namespace
+        &self.namespace
     }
 }
 

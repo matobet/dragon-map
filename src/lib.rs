@@ -1,7 +1,7 @@
 #[macro_use]
 extern crate redis_module;
 
-use redis_module::{Context, NotifyEvent, RedisResult, Status};
+use redis_module::{Context, NotifyEvent, RedisResult, RedisString, Status};
 
 mod ops;
 
@@ -13,7 +13,7 @@ fn on_event(ctx: &Context, _event_type: NotifyEvent, _event: &str, key: &str) {
     ops::EventGroom::from(&ctx, key).perform();
 }
 
-fn init(ctx: &Context, _args: &Vec<String>) -> Status {
+fn init(ctx: &Context, _args: &Vec<RedisString>) -> Status {
     ops::Init::from(ctx).perform();
 
     Status::Ok
@@ -24,23 +24,23 @@ fn init(ctx: &Context, _args: &Vec<String>) -> Status {
 //               <key_2> <value_2> <idx_1_for_k_2> <idx_2_for_k_2> ... <idx_n_for_k_2>
 //               ...
 //               <key_n> <value_n> <idx_1_for_k_n> <idx_2_for_k_n> ... <idx_n_for_k_n>
-fn msetex_indexed(ctx: &Context, args: Vec<String>) -> RedisResult {
-    ops::Set::from(ctx, &args)?.process()
+fn msetex_indexed(ctx: &Context, args: Vec<RedisString>) -> RedisResult {
+    ops::Set::from(ctx, args)?.process()
 }
 
 // MAP.get_by_index <namespace> idx idx_val
-fn get_by_index(ctx: &Context, args: Vec<String>) -> RedisResult {
-    ops::Get::from(ctx, &args)?.process()
+fn get_by_index(ctx: &Context, args: Vec<RedisString>) -> RedisResult {
+    ops::Get::from(ctx, args)?.process()
 }
 
 // MAP.rem_by_index <namespace> idx idx_val
-fn rem_by_index(ctx: &Context, args: Vec<String>) -> RedisResult {
-    ops::RemoveByIndex::from(ctx, &args)?.process()
+fn rem_by_index(ctx: &Context, args: Vec<RedisString>) -> RedisResult {
+    ops::RemoveByIndex::from(ctx, args)?.process()
 }
 
 // MAP.mrem <namespace> k1 k2 ... kn
-fn mrem(ctx: &Context, args: Vec<String>) -> RedisResult {
-    ops::Remove::from(ctx, &args)?.process()
+fn mrem(ctx: &Context, args: Vec<RedisString>) -> RedisResult {
+    ops::Remove::from(ctx, args)?.process()
 }
 
 redis_module! {
