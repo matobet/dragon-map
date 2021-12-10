@@ -10,11 +10,11 @@ crate-type = ["cdylib"]
 name = "dragon_map"
 
 [dependencies]
-redis-module = { version = "0.24", features = ["experimental-api"] }
+redis-module = { path = "../redismodule-rs", features = ["experimental-api"] }
 itertools = "0.10"
 
 [dev-dependencies]
 rand = "0.7"
 redis = "0.20"
-redis-module = { version = "0.24", features = ["experimental-api", "test"] }
+redis-module = { path = "../redismodule-rs", features = ["experimental-api", "test"] }
 redis-test-macros = { path = "redis-test-macros" }

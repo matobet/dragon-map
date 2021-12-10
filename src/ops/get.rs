@@ -1,3 +1,5 @@
+use std::borrow::Borrow;
+
 use itertools::Itertools;
 use redis_module::{Context, NextArg, RedisError, RedisResult, RedisString, RedisValue};
 
@@ -5,18 +7,18 @@ use super::*;
 
 pub struct Get<'a> {
     ctx: &'a Context,
-    namespace: String,
-    idx: String,
-    idx_val: String,
+    namespace: RedisString,
+    idx: RedisString,
+    idx_val: RedisString,
 }
 
 impl<'a> Get<'a> {
     pub fn from(ctx: &'a Context, args: Vec<RedisString>) -> Result<Self, RedisError> {
         let mut args = args.into_iter().skip(1);
 
-        let namespace = args.next_string()?;
-        let idx = args.next_string()?;
-        let idx_val = args.next_string()?;
+        let namespace = args.next_arg()?;
+        let idx = args.next_arg()?;
+        let idx_val = args.next_arg()?;
 
         Ok(Get {
             ctx,
@@ -27,7 +29,7 @@ impl<'a> Get<'a> {
     }
 
     pub fn process(&self) -> RedisResult {
-        let idx_key = &self.prefixed_idx(&self.idx, &self.idx_val);
+        let idx_key = &self.prefixed_idx(self.idx.borrow(), self.idx_val.borrow());
         let keys = self.smembers(idx_key)?;
         if keys.is_empty() {
             Ok(RedisValue::Array(vec![]))
@@ -41,7 +43,7 @@ impl<'a> Get<'a> {
 
 impl Namespaced for Get<'_> {
     fn namespace(&self) -> &str {
-        &self.namespace
+        self.namespace.borrow()
     }
 }
 

@@ -1,3 +1,5 @@
+use std::borrow::Borrow;
+
 use redis_module::{Context, NextArg, RedisError, RedisResult, RedisString, REDIS_OK};
 
 use itertools::{interleave, Itertools};
@@ -6,18 +8,18 @@ use super::*;
 
 pub struct Set<'a> {
     ctx: &'a Context,
-    namespace: String,
-    expiry: String,
-    indices: Vec<String>,
-    kv_index_lines: Vec<String>,
+    namespace: RedisString,
+    expiry: RedisString,
+    indices: Vec<RedisString>,
+    kv_index_lines: Vec<RedisString>,
 }
 
 impl<'a> Set<'a> {
     pub fn from(ctx: &'a Context, args: Vec<RedisString>) -> Result<Self, RedisError> {
         let mut args = args.into_iter().skip(1);
 
-        let namespace = args.next_string()?;
-        let expiry = args.next_string()?;
+        let namespace = args.next_arg()?;
+        let expiry = args.next_arg()?;
         let index_count = args.next_u64()? as usize;
 
         if args.len() < index_count {
@@ -52,20 +54,21 @@ impl<'a> Set<'a> {
         REDIS_OK
     }
 
-    fn process_kv_line(&self, kv_index_line: &[String]) -> RedisResult {
+    fn process_kv_line(&self, kv_index_line: &[RedisString]) -> RedisResult {
         let key = &kv_index_line[0];
         let value = &kv_index_line[1];
         let index_values = &kv_index_line[2..];
 
         // in case old value is present we need to make sure old index values are cleared
-        if self.exists(&self.prefixed_meta(key))? {
-            self.clean_key(key)?;
+        if self.exists(&self.prefixed_meta(key.borrow()))? {
+            self.clean_key(key.borrow())?;
         }
 
-        self.ctx.call("SETEX", &[&self.prefixed(key), &self.expiry, value])?;
+        self.ctx
+            .call("SETEX", &[&self.prefixed(key.borrow()), self.expiry.borrow(), value.borrow()])?;
 
         for (idx, idx_val) in self.indices.iter().zip(index_values) {
-            self.add_to_index(key, idx, idx_val)?;
+            self.add_to_index(key.borrow(), idx.borrow(), idx_val.borrow())?;
         }
 
         self.write_meta(key, index_values)
@@ -75,10 +78,10 @@ impl<'a> Set<'a> {
         self.ctx.call("SADD", &[&self.prefixed_idx(idx, idx_val), key])
     }
 
-    fn write_meta(&self, key: &str, index_values: &[String]) -> RedisResult {
-        let mut interleaved = interleave(&self.indices, index_values).map(|s| s.as_str()).collect_vec();
+    fn write_meta(&self, key: &RedisString, index_values: &[RedisString]) -> RedisResult {
+        let mut interleaved: Vec<&str> = interleave(&self.indices, index_values).map(Borrow::borrow).collect_vec();
         if !interleaved.is_empty() {
-            let meta = self.prefixed_meta(key);
+            let meta = self.prefixed_meta(key.borrow());
             interleaved.insert(0, &meta);
             self.ctx.call("HMSET", interleaved.as_slice())?;
         }
@@ -88,7 +91,7 @@ impl<'a> Set<'a> {
 
 impl Namespaced for Set<'_> {
     fn namespace(&self) -> &str {
-        &self.namespace
+        self.namespace.borrow()
     }
 }
 
