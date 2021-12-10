@@ -20,7 +20,7 @@ impl<'a> EventGroom<'a> {
 
         // clean_key ensures that meta is removed in case of key expiry
         // and vice versa that key is removed in case of meta expiry
-        self.clean_key(&self.key).unwrap_or_else(|e| {
+        self.clean_key(self.key).unwrap_or_else(|e| {
             self.ctx
                 .log(LogLevel::Warning, &format!("Error grooming key [ {} ]: {}", self.key, e))
         });
@@ -35,7 +35,7 @@ impl Namespaced for EventGroom<'_> {
 
 impl Contextual for EventGroom<'_> {
     fn context(&self) -> &Context {
-        &self.ctx
+        self.ctx
     }
 }
 

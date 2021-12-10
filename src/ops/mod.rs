@@ -77,7 +77,7 @@ impl IntoRedisResult<i64> for RedisValue {
         if let RedisValue::Integer(n) = self {
             Ok(n)
         } else {
-            Err(RedisError::String(format!("command returned non-integer response!")))
+            Err(RedisError::String("command returned non-integer response!".to_string()))
         }
     }
 }
@@ -93,7 +93,7 @@ impl IntoRedisResult<Vec<String>> for RedisValue {
         if let RedisValue::Array(values) = self {
             Ok(extract_strings(values))
         } else {
-            Err(RedisError::String(format!("command didn't return a list of strings!")))
+            Err(RedisError::String("command didn't return a list of strings!".to_string()))
         }
     }
 }

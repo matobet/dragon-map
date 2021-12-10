@@ -10,10 +10,10 @@ fn on_event(ctx: &Context, _event_type: NotifyEvent, _event: &str, key: &str) {
         ctx.log_debug(&format!("Evicting {}", key));
     }
 
-    ops::EventGroom::from(&ctx, key).perform();
+    ops::EventGroom::from(ctx, key).perform();
 }
 
-fn init(ctx: &Context, _args: &Vec<RedisString>) -> Status {
+fn init(ctx: &Context, _args: &[RedisString]) -> Status {
     ops::Init::from(ctx).perform();
 
     Status::Ok
