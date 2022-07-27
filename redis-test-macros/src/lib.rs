@@ -1,5 +1,3 @@
-#![feature(proc_macro_quote)]
-
 #[macro_use]
 extern crate quote;
 extern crate syn;
